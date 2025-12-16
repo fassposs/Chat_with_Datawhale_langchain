@@ -28,7 +28,7 @@ from time import mktime
 from urllib.parse import urlencode
 from wsgiref.handlers import format_date_time
 import zhipuai
-from langchain.utils import get_from_dict_or_env
+# from langchain_community.utils import get_from_dict_or_env
 
 import websocket  # 使用websocket_client
 
@@ -312,7 +312,7 @@ def parse_llm_api_key(model:str, env_file:dict()=None):
     elif model == "spark":
         return env_file["spark_api_key"], env_file["spark_appid"], env_file["spark_api_secret"]
     elif model == "zhipuai":
-        return get_from_dict_or_env(env_file, "zhipuai_api_key", "ZHIPUAI_API_KEY")
-        # return env_file["ZHIPUAI_API_KEY"]
+        # return get_from_dict_or_env(env_file, "zhipuai_api_key", "ZHIPUAI_API_KEY")
+        return env_file["ZHIPUAI_API_KEY"]
     else:
         raise ValueError(f"model{model} not support!!!")

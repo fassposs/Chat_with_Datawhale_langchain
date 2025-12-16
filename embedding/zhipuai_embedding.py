@@ -4,8 +4,9 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from langchain.embeddings.base import Embeddings
-from langchain.pydantic_v1 import BaseModel, root_validator
-from langchain.utils import get_from_dict_or_env
+# from langchain.pydantic_v1 import BaseModel, root_validator
+from pydantic import BaseModel, model_validator
+from langchain_core.utils import get_from_dict_or_env
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +17,7 @@ class ZhipuAIEmbeddings(BaseModel, Embeddings):
     zhipuai_api_key: Optional[str] = None
     """Zhipuai application apikey"""
 
-    @root_validator()
+    @model_validator(mode='after')
     def validate_environment(cls, values: Dict) -> Dict:
         """
         Validate whether zhipuai_api_key in the environment variables or

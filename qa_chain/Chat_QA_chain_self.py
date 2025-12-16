@@ -1,8 +1,8 @@
-from langchain.prompts import PromptTemplate
-from langchain.chains import RetrievalQA
-from langchain.vectorstores import Chroma
+# from langchain_core.prompts import PromptTemplate
+# from langchain_core import RetrievalQA
+# from langchain_chroma import Chroma
 from langchain.chains import ConversationalRetrievalChain
-from langchain.memory import ConversationBufferMemory
+from langchain_chroma import ConversationBufferMemory
 from langchain.chat_models import ChatOpenAI
 import sys
 sys.path.append('/Users/lta/Desktop/llm-universe/project')
