@@ -1,9 +1,12 @@
 # from langchain_core.prompts import PromptTemplate
 # from langchain_core import RetrievalQA
 # from langchain_chroma import Chroma
-from langchain.chains import ConversationalRetrievalChain
-from langchain_chroma import ConversationBufferMemory
-from langchain.chat_models import ChatOpenAI
+# from langchain.chains import ConversationalRetrievalChain
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.runnables import RunnablePassthrough, RunnableLambda
+from langchain_core.output_parsers import StrOutputParser
+# from langchain_chroma import ConversationBufferMemory
+# from langchain.chat_models import ChatOpenAI
 import sys
 sys.path.append('/Users/lta/Desktop/llm-universe/project')
 from qa_chain.model_to_llm import model_to_llm
@@ -63,6 +66,26 @@ class Chat_QA_chain_self:
         return self.chat_history[n-history_len:]
 
  
+    def _combine_chat_history_and_question(self,inputs):
+        """组合聊天历史和当前问题"""
+        chat_history = inputs["chat_history"] or []
+        question = inputs["question"]
+        
+        # 构造聊天历史字符串
+        chat_history_str = ""
+        for human, ai in chat_history:
+            chat_history_str += f"Human: {human}\nAI: {ai}\n"
+        
+        return {
+            "question": question,
+            "chat_history": chat_history_str,
+            "context": self.format_docs(inputs["context"])
+        }
+
+    def format_docs(self, docs):
+        """格式化检索到的文档"""
+        return "\n\n".join(doc.page_content for doc in docs)
+
     def answer(self, question:str=None,temperature = None, top_k = 4):
         """"
         核心方法，调用问答链
@@ -78,17 +101,68 @@ class Chat_QA_chain_self:
         
         if temperature == None:
             temperature = self.temperature
-        llm = model_to_llm(self.model, temperature, self.appid, self.api_key, self.Spark_api_secret,self.Wenxin_secret_key)
+
+        # 获取一个大模型  
+        llm = model_to_llm(
+            self.model, 
+            temperature, 
+            self.appid, 
+            self.api_key, 
+            self.Spark_api_secret,
+            self.Wenxin_secret_key
+        )
 
         #self.memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
 
+        # 获取检索数据库
         retriever = self.vectordb.as_retriever(search_type="similarity",   
                                         search_kwargs={'k': top_k})  #默认similarity，k=4
-
-        qa = ConversationalRetrievalChain.from_llm(
-            llm = llm,
-            retriever = retriever
+        # ===========================================
+        condense_question_system_template = (
+            "请根据聊天记录总结用户最近的问题，"
+            "如果没有多余的聊天记录则返回用户的问题。"
         )
+        condense_question_prompt = ChatPromptTemplate([
+                ("system", condense_question_system_template),
+                ("placeholder", "{chat_history}"),
+                ("human", "{input}"),
+            ])
+
+        retrieve_docs = RunnableBranch(
+            (lambda x: not x.get("chat_history", False), (lambda x: x["input"]) | retriever, ),
+            condense_question_prompt | llm | StrOutputParser() | retriever,
+        )
+
+        system_prompt = (
+            "你是一个问答任务的助手。 "
+            "请使用检索到的上下文片段回答这个问题。 "
+            "如果你不知道答案就说不知道。 "
+            "请使用简洁的话语回答用户。"
+            "\n\n"
+            "{context}"
+        )
+        qa_prompt = ChatPromptTemplate.from_messages(
+            [
+                ("system", system_prompt),
+                ("placeholder", "{chat_history}"),
+                ("human", "{input}"),
+            ]
+        )
+        qa_chain = (
+            RunnablePassthrough().assign(context=combine_docs)
+            | qa_prompt
+            | llm
+            | StrOutputParser()
+        )
+
+        qa = RunnablePassthrough().assign(
+            context = retrieve_docs, 
+            ).assign(answer=qa_chain)
+        # ===========================================
+        # qa = ConversationalRetrievalChain.from_llm(
+        #     llm = llm,
+        #     retriever = retriever
+        # )
         
         #print(self.llm)
         result = qa({"question": question,"chat_history": self.chat_history})       #result里有question、chat_history、answer

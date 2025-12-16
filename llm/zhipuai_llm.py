@@ -22,14 +22,15 @@ from typing import (
     Optional,
 )
 
-from langchain.callbacks.manager import (
+from langchain_core.callbacks.manager import (
     AsyncCallbackManagerForLLMRun,
     CallbackManagerForLLMRun,
 )
-from langchain.llms.base import LLM
-from langchain.pydantic_v1 import Field, root_validator
-from langchain.schema.output import GenerationChunk
-from langchain.utils import get_from_dict_or_env
+from langchain_core.language_models import LLM
+#from langchain.pydantic_v1 import Field, root_validator
+from pydantic import Field, model_validator
+from langchain_core.outputs import GenerationChunk
+from langchain_core.utils import get_from_dict_or_env
 from llm.self_llm import Self_LLM
 
 logger = logging.getLogger(__name__)
@@ -76,7 +77,7 @@ class ZhipuAILLM(Self_LLM):
     temperature: Optional[float] = 0.95
     request_id: Optional[float] = None
 
-    @root_validator()
+    @model_validator(mode='after')
     def validate_enviroment(cls, values: Dict) -> Dict:
 
         values["zhipuai_api_key"] = get_from_dict_or_env(

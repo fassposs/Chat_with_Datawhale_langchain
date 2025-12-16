@@ -1,4 +1,4 @@
-from langchain_core import PromptTemplate
+from langchain_core.prompts import PromptTemplate
 from langchain_core import RetrievalQA
 from langchain_chroma import Chroma
 import sys
