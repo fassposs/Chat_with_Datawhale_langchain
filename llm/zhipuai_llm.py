@@ -26,7 +26,8 @@ from langchain_core.callbacks.manager import (
     AsyncCallbackManagerForLLMRun,
     CallbackManagerForLLMRun,
 )
-from langchain_zhipuai import ZhipuAI
+from langchain_community.chat_models import ChatZhipuAI
+from langchain.messages import AIMessage, HumanMessage, SystemMessage
 # from zhipuai import ZhipuAI
 from pydantic import Field, model_validator
 from langchain_core.outputs import GenerationChunk
@@ -88,7 +89,7 @@ class ZhipuAILLM(Self_LLM):
             "BASE_URL",
         )
         try:
-            values["client"] = ZhipuAI(api_key=values["api_key"],base_url=values["base_url"])
+            values["client"] = ChatZhipuAI(api_key=values["api_key"],base_url=values["base_url"])
         except ImportError:
             raise ValueError(
                 "zhipuai package not found, please install it with "

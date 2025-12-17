@@ -1,21 +1,18 @@
-import gradio as gr
-import random
-import time
+from langchain_community.chat_models import ChatZhipuAI
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
-with gr.Blocks() as demo:
-    chatbot = gr.Chatbot()
-    msg = gr.Textbox()
-    clear = gr.Button("清除")
+chat = ChatZhipuAI(
+    model="glm-4.5-flash",
+    temperature=0.5,
+    zhipuai_api_key=".wyOnha8gBn8U9BoB",
+    # zhipuai_api_key="sk-7itaucv9ZCYdQzy3MFThr5O9RLPMLC1ZVuOXC2h5Tu4F8SK7",
+    # api_base="https://api.qingyuntop.top/v1",
+)
+messages = [
+    AIMessage(content="Hi."),
+    SystemMessage(content="Your role is a poet."),
+    HumanMessage(content="简单介绍一下人工智能,不要太多文字"),
+]
 
-    def respond(message, chat_history):
-        bot_message = random.choice(["你好吗？", "我爱你", "我很饿"])
-        chat_history.append({"role": "user", "content": message})
-        chat_history.append({"role": "assistant", "content": bot_message})
-        time.sleep(1)
-        return "", chat_history
-
-    msg.submit(respond, [msg, chatbot], [msg, chatbot])
-    clear.click(lambda: None, None, chatbot, queue=False)
-
-gr.close_all()
-demo.launch()
+response = chat.invoke(messages)
+print(response.content)  # Displays the AI-generated poem
