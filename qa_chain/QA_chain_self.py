@@ -1,6 +1,10 @@
 from langchain_core.prompts import PromptTemplate
-from langchain_core import RetrievalQA
-from langchain_chroma import Chroma
+# from langchain_core import RetrievalQA
+# from langchain.chains import create_retrieval_chain
+from operator import itemgetter
+from langchain_core.runnables import RunnableLambda
+from langchain_core.output_parsers import StrOutputParser
+# from langchain_chroma import Chroma
 import sys
 sys.path.append("../")
 from qa_chain.model_to_llm import model_to_llm
@@ -45,22 +49,34 @@ class QA_chain_self():
         self.embedding = embedding
         self.embedding_key = embedding_key
         self.template = template
-        self.vectordb = get_vectordb(self.file_path, self.persist_path, self.embedding,self.embedding_key)
+        # self.vectordb = get_vectordb(self.file_path, self.persist_path, self.embedding,self.embedding_key)
+        # self.retriever = self.vectordb.as_retriever(search_type="similarity", search_kwargs={'k': self.top_k})  #默认similarity，k=4
         self.llm = model_to_llm(self.model, self.temperature, self.appid, self.api_key, self.Spark_api_secret,self.Wenxin_secret_key)
 
-        self.QA_CHAIN_PROMPT = PromptTemplate(input_variables=["context","question"],
-                                    template=self.template)
-        self.retriever = self.vectordb.as_retriever(search_type="similarity",   
-                                        search_kwargs={'k': self.top_k})  #默认similarity，k=4
+        self.QA_CHAIN_PROMPT = PromptTemplate(input_variables=["context","question"],template=self.template)
+        
         # 自定义 QA 链
-        self.qa_chain = RetrievalQA.from_chain_type(llm=self.llm,
-                                        retriever=self.retriever,
-                                        return_source_documents=True,
-                                        chain_type_kwargs={"prompt":self.QA_CHAIN_PROMPT})
+        # self.qa_chain = RetrievalQA.from_chain_type(llm=self.llm,
+        #                                 retriever=self.retriever,
+        #                                 return_source_documents=True,
+        #                                 chain_type_kwargs={"prompt":self.QA_CHAIN_PROMPT})
+        self.qa_chain = (
+            {   
+                "question": itemgetter("question"),
+                "context": itemgetter("question")# itemgetter("question") | self.retriever | RunnableLambda(self.combine_docs)
+            }
+            | self.QA_CHAIN_PROMPT
+            | self.llm
+            | StrOutputParser()
+        )
 
     #基于大模型的问答 prompt 使用的默认提示模版
     #default_template_llm = """请回答下列问题:{question}"""
-           
+    
+    # 提取数据啊
+    def combine_docs(self,docs):
+        return "\n\n".join(doc.page_content for doc in docs)
+
     def answer(self, question:str=None, temperature = None, top_k = 4):
         """"
         核心方法，调用问答链
@@ -77,7 +93,7 @@ class QA_chain_self():
         if top_k == None:
             top_k = self.top_k
 
-        result = self.qa_chain({"query": question, "temperature": temperature, "top_k": top_k})
+        result = self.qa_chain.invoke({"question": question})
         answer = result["result"]
         answer = re.sub(r"\\n", '<br/>', answer)
         return answer   

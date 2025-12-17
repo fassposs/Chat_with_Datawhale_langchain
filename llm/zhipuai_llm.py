@@ -26,8 +26,8 @@ from langchain_core.callbacks.manager import (
     AsyncCallbackManagerForLLMRun,
     CallbackManagerForLLMRun,
 )
-from langchain_core.language_models import LLM
-#from langchain.pydantic_v1 import Field, root_validator
+from langchain_zhipuai import ZhipuAI
+# from zhipuai import ZhipuAI
 from pydantic import Field, model_validator
 from langchain_core.outputs import GenerationChunk
 from langchain_core.utils import get_from_dict_or_env
@@ -35,7 +35,7 @@ from llm.self_llm import Self_LLM
 
 logger = logging.getLogger(__name__)
 
-
+    
 class ZhipuAILLM(Self_LLM):
     """Zhipuai hosted open source or customized models.
 
@@ -61,8 +61,6 @@ class ZhipuAILLM(Self_LLM):
     model: str = "chatglm_std"
     """Model name in chatglm_pro, chatglm_std, chatglm_lite. """
 
-    zhipuai_api_key: Optional[str] = None
-
     incremental: Optional[bool] = True
     """Whether to incremental the results or not."""
 
@@ -77,24 +75,20 @@ class ZhipuAILLM(Self_LLM):
     temperature: Optional[float] = 0.95
     request_id: Optional[float] = None
 
-    @model_validator(mode='after')
+    @model_validator(mode='before')
     def validate_enviroment(cls, values: Dict) -> Dict:
-
-        values["zhipuai_api_key"] = get_from_dict_or_env(
+        values["api_key"] = get_from_dict_or_env(
             values,
-            "zhipuai_api_key",
+            "api_key",
             "ZHIPUAI_API_KEY",
         )
-
-        params = {
-            "zhipuai_api_key": values["zhipuai_api_key"],
-            "model": values["model"],
-        }
+        values["base_url"] = get_from_dict_or_env(
+            values,
+            "base_url",
+            "BASE_URL",
+        )
         try:
-            import zhipuai
-
-            zhipuai.api_key = values["zhipuai_api_key"]
-            values["client"] = zhipuai.model_api
+            values["client"] = ZhipuAI(api_key=values["api_key"],base_url=values["base_url"])
         except ImportError:
             raise ValueError(
                 "zhipuai package not found, please install it with "

@@ -9,7 +9,8 @@ from llm.call_llm import parse_llm_api_key
 
 def get_embedding(embedding: str, embedding_key: str=None, env_file: str=None):
     if embedding == 'm3e':
-        return HuggingFaceEmbeddings(model_name="moka-ai/m3e-base")
+        local_model_path = "./serve/models/moka-ai/m3e-base"
+        return HuggingFaceEmbeddings(model_name=local_model_path)
     if embedding_key == None:
         embedding_key = parse_llm_api_key(embedding)
     if embedding == "openai":

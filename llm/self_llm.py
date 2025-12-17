@@ -27,6 +27,8 @@ class Self_LLM(LLM):
     temperature: float = 0.1
     # API_Key
     api_key: str = None
+    # base_url
+    base_url: str = None
     # 必备的可选参数
     model_kwargs: Dict[str, Any] = Field(default_factory=dict)
 

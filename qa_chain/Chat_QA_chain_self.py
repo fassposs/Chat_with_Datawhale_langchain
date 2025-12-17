@@ -65,23 +65,6 @@ class Chat_QA_chain_self:
         n = len(self.chat_history)
         return self.chat_history[n-history_len:]
 
- 
-    def _combine_chat_history_and_question(self,inputs):
-        """组合聊天历史和当前问题"""
-        chat_history = inputs["chat_history"] or []
-        question = inputs["question"]
-        
-        # 构造聊天历史字符串
-        chat_history_str = ""
-        for human, ai in chat_history:
-            chat_history_str += f"Human: {human}\nAI: {ai}\n"
-        
-        return {
-            "question": question,
-            "chat_history": chat_history_str,
-            "context": self.format_docs(inputs["context"])
-        }
-
     def format_docs(self, docs):
         """格式化检索到的文档"""
         return "\n\n".join(doc.page_content for doc in docs)

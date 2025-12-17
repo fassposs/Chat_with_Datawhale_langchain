@@ -27,12 +27,11 @@ from datetime import datetime
 from time import mktime
 from urllib.parse import urlencode
 from wsgiref.handlers import format_date_time
-import zhipuai
-# from langchain_community.utils import get_from_dict_or_env
-
+from zhipuai import ZhipuAI
+from global_data.global_data import LLM_MODEL_DICT
 import websocket  # 使用websocket_client
 
-def get_completion(prompt :str, model :str, temperature=0.1,api_key=None, secret_key=None, access_token=None, appid=None, api_secret=None, max_tokens=2048):
+def get_completion(prompt :str, model :str, temperature=0.1,api_key=None, secret_key=None, access_token=None, appid=None, api_secret=None, max_tokens=2048,base_url=None):
     # 调用大模型获取回复，支持上述三种模型+gpt
     # arguments:
     # prompt: 输入提示
@@ -50,8 +49,8 @@ def get_completion(prompt :str, model :str, temperature=0.1,api_key=None, secret
         return get_completion_wenxin(prompt, model, temperature, api_key, secret_key)
     elif model in ["Spark-1.5", "Spark-2.0"]:
         return get_completion_spark(prompt, model, temperature, api_key, appid, api_secret, max_tokens)
-    elif model in ["chatglm_pro", "chatglm_std", "chatglm_lite"]:
-        return get_completion_glm(prompt, model, temperature, api_key, max_tokens)
+    elif model in LLM_MODEL_DICT["zhipuai"]:
+        return get_completion_glm(prompt, model, temperature, api_key, max_tokens, base_url)
     else:
         return "不正确的模型"
     
@@ -129,19 +128,23 @@ def get_completion_spark(prompt : str, model : str, temperature : float, api_key
     response = spark_main(appid,api_key,api_secret,Spark_url,domain,question,temperature, max_tokens)
     return response
 
-def get_completion_glm(prompt : str, model : str, temperature : float, api_key:str, max_tokens : int):
+def get_completion_glm(prompt : str, model : str, temperature : float, api_key:str, max_tokens : int, base_url:str=None):
     # 获取GLM回答
     if api_key == None:
         api_key = parse_llm_api_key("zhipuai")
-    zhipuai.api_key = api_key
+    if base_url == None: base_url = os.environ.get("BASE_URL",None)
 
-    response = zhipuai.model_api.invoke(
+    client = ZhipuAI(api_key=api_key,base_url=base_url)
+    # Create chat completion
+    response = client.chat.completions.create(
         model=model,
-        prompt=[{"role":"user", "content":prompt}],
+        messages=[
+            {"role": "user", "content": prompt}
+        ],
         temperature = temperature,
         max_tokens=max_tokens
-        )
-    return response["data"]["choices"][0]["content"].strip('"').strip(" ")
+    )
+    return response.choices[0].message.content
 
 # def getText(role, content, text = []):
 #     # role 是指定角色，content 是 prompt 内容
@@ -298,13 +301,14 @@ def spark_main(appid, api_key, api_secret, Spark_url,domain, question, temperatu
     ws.run_forever(sslopt={"cert_reqs": ssl.CERT_NONE})
     return ''.join([output_queue.get() for _ in range(output_queue.qsize())])
 
-def parse_llm_api_key(model:str, env_file:dict()=None):
+def parse_llm_api_key(model:str, env_file:dict=None):
     """
     通过 model 和 env_file 的来解析平台参数
     """   
     if env_file == None:
         _ = load_dotenv(find_dotenv())
         env_file = os.environ
+
     if model == "openai":
         return env_file["OPENAI_API_KEY"]
     elif model == "wenxin":
@@ -312,7 +316,6 @@ def parse_llm_api_key(model:str, env_file:dict()=None):
     elif model == "spark":
         return env_file["spark_api_key"], env_file["spark_appid"], env_file["spark_api_secret"]
     elif model == "zhipuai":
-        # return get_from_dict_or_env(env_file, "zhipuai_api_key", "ZHIPUAI_API_KEY")
         return env_file["ZHIPUAI_API_KEY"]
     else:
         raise ValueError(f"model{model} not support!!!")

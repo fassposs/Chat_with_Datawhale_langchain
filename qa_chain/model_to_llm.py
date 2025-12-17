@@ -5,9 +5,11 @@ from llm.spark_llm import Spark_LLM
 from llm.zhipuai_llm import ZhipuAILLM
 from langchain_openai import ChatOpenAI
 from llm.call_llm import parse_llm_api_key
+from global_data.global_data import LLM_MODEL_DICT
+import os
 
 
-def model_to_llm(model:str=None, temperature:float=0.0, appid:str=None, api_key:str=None,Spark_api_secret:str=None,Wenxin_secret_key:str=None):
+def model_to_llm(model:str=None, temperature:float=0.0, appid:str=None, api_key:str=None,Spark_api_secret:str=None,Wenxin_secret_key:str=None,base_url:str=None):
         """
         星火：model,temperature,appid,api_key,api_secret
         百度问心：model,temperature,api_key,api_secret
@@ -26,10 +28,11 @@ def model_to_llm(model:str=None, temperature:float=0.0, appid:str=None, api_key:
             if api_key == None or appid == None and Spark_api_secret == None:
                 api_key, appid, Spark_api_secret = parse_llm_api_key("spark")
             llm = Spark_LLM(model=model, temperature = temperature, appid=appid, api_secret=Spark_api_secret, api_key=api_key)
-        elif model in ["chatglm_pro", "chatglm_std", "chatglm_lite"]:
+        elif model in LLM_MODEL_DICT["zhipuai"]:
             if api_key == None:
                 api_key = parse_llm_api_key("zhipuai")
-            llm = ZhipuAILLM(model=model, zhipuai_api_key=api_key, temperature = temperature)
+            if base_url == None: base_url = os.environ.get("BASE_URL",None)
+            llm = ZhipuAILLM(model=model, api_key=api_key, temperature = temperature,base_url=base_url)
         else:
             raise ValueError(f"model{model} not support!!!")
         return llm

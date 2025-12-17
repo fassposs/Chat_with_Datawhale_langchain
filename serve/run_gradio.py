@@ -12,6 +12,7 @@ from database.create_db import create_db_info
 from qa_chain.Chat_QA_chain_self import Chat_QA_chain_self
 from qa_chain.QA_chain_self import QA_chain_self
 import re
+from global_data.global_data import LLM_MODEL_DICT,INIT_LLM
 # 导入 dotenv 库的函数
 # dotenv 允许您从 .env 文件中读取环境变量
 # 这在开发时特别有用，可以避免将敏感信息（如API密钥）硬编码到代码中
@@ -19,16 +20,8 @@ import re
 # 寻找 .env 文件并加载它的内容
 # 这允许您使用 os.environ 来读取在 .env 文件中设置的环境变量
 _ = load_dotenv(find_dotenv())
-LLM_MODEL_DICT = {
-    "openai": ["gpt-3.5-turbo", "gpt-3.5-turbo-16k-0613", "gpt-3.5-turbo-0613", "gpt-4", "gpt-4-32k"],
-    "wenxin": ["ERNIE-Bot", "ERNIE-Bot-4", "ERNIE-Bot-turbo"],
-    "xinhuo": ["Spark-1.5", "Spark-2.0"],
-    "zhipuai": ["chatglm_pro", "chatglm_std", "chatglm_lite"]
-}
-
 
 LLM_MODEL_LIST = sum(list(LLM_MODEL_DICT.values()),[])
-INIT_LLM = "chatglm_std"
 EMBEDDING_MODEL_LIST = ['zhipuai', 'openai', 'm3e']
 INIT_EMBEDDING_MODEL = "m3e"
 DEFAULT_DB_PATH = "./knowledge_db"
@@ -40,6 +33,7 @@ DATAWHALE_LOGO_PATH = "./figures/datawhale_logo.png"
 
 def get_model_by_platform(platform):
     return LLM_MODEL_DICT.get(platform, "")
+
 class Model_center():
     """
     存储问答 Chain 的对象 
@@ -77,13 +71,17 @@ class Model_center():
                 self.qa_chain_self[(model, embedding)] = QA_chain_self(model=model, temperature=temperature,
                                                                        top_k=top_k, file_path=file_path, persist_path=persist_path, embedding=embedding)
             chain = self.qa_chain_self[(model, embedding)]
-            chat_history.append(
-                (question, chain.answer(question, temperature, top_k)))
+            # 将用户的消息和机器人的回复加入到聊天历史记录中。
+            chat_history.append({"role": "user","content":question})
+            chat_history.append({"role": "assistant","content":chain.answer(question, temperature, top_k)})
             return "", chat_history
         except Exception as e:
             return e, chat_history
 
     def clear_history(self):
+        """
+        清除历史记录
+        """
         if len(self.chat_qa_chain_self) > 0:
             for chain in self.chat_qa_chain_self.values():
                 chain.clear_history()
@@ -114,7 +112,6 @@ def format_chat_prompt(message, chat_history):
     return prompt
 
 
-
 def respond(message, chat_history, llm, history_len=3, temperature=0.1, max_tokens=2048):
     """
     该函数用于生成机器人的回复。
@@ -135,12 +132,13 @@ def respond(message, chat_history, llm, history_len=3, temperature=0.1, max_toke
         # 调用上面的函数，将用户的消息和聊天历史记录格式化为一个 prompt。
         formatted_prompt = format_chat_prompt(message, chat_history)
         # 使用llm对象的predict方法生成机器人的回复（注意：llm对象在此代码中并未定义）。
-        bot_message = get_completion(
-            formatted_prompt, llm, temperature=temperature, max_tokens=max_tokens)
+        bot_message = get_completion(formatted_prompt, llm, temperature=temperature, max_tokens=max_tokens)
         # 将bot_message中\n换为<br/>
         bot_message = re.sub(r"\\n", '<br/>', bot_message)
         # 将用户的消息和机器人的回复加入到聊天历史记录中。
-        chat_history.append((message, bot_message))
+        chat_history.append({"role": "user","content":message})
+        chat_history.append({"role": "assistant","content":bot_message})
+        
         # 返回一个空字符串和更新后的聊天历史记录（这里的空字符串可以替换为真正的机器人回复，如果需要显示在界面上）。
         return "", chat_history
     except Exception as e:
@@ -152,17 +150,17 @@ model_center = Model_center()
 block = gr.Blocks()
 with block as demo:
     with gr.Row(equal_height=True):           
-        gr.Image(value=AIGC_LOGO_PATH, scale=1, min_width=10, show_label=False, show_download_button=False, container=False)
+        gr.Image(value=AIGC_LOGO_PATH, scale=1, min_width=10, show_label=False, container=False)
    
         with gr.Column(scale=2):
             gr.Markdown("""<h1><center>动手学大模型应用开发</center></h1>
                 <center>LLM-UNIVERSE</center>
                 """)
-        gr.Image(value=DATAWHALE_LOGO_PATH, scale=1, min_width=10, show_label=False, show_download_button=False, container=False)
+        gr.Image(value=DATAWHALE_LOGO_PATH, scale=1, min_width=10, show_label=False, container=False)
 
     with gr.Row():
         with gr.Column(scale=4):
-            chatbot = gr.Chatbot(height=400, show_copy_button=True, show_share_button=True, avatar_images=(AIGC_AVATAR_PATH, DATAWHALE_AVATAR_PATH))
+            chatbot = gr.Chatbot(height=400, avatar_images=(AIGC_AVATAR_PATH, DATAWHALE_AVATAR_PATH))
             # 创建一个文本框组件，用于输入 prompt。
             msg = gr.Textbox(label="Prompt/问题")
 
@@ -173,8 +171,7 @@ with block as demo:
                 llm_btn = gr.Button("Chat with llm")
             with gr.Row():
                 # 创建一个清除按钮，用于清除聊天机器人组件的内容。
-                clear = gr.ClearButton(
-                    components=[chatbot], value="Clear console")
+                clear = gr.ClearButton(components=[chatbot], value="Clear console")
 
         with gr.Column(scale=1):
             file = gr.File(label='请选择知识库目录', file_count='directory',
@@ -220,20 +217,18 @@ with block as demo:
         init_db.click(create_db_info,
                       inputs=[file, embeddings], outputs=[msg])
 
-        # 设置按钮的点击事件。当点击时，调用上面定义的 chat_qa_chain_self_answer 函数，并传入用户的消息和聊天历史记录，然后更新文本框和聊天机器人组件。
-        db_with_his_btn.click(model_center.chat_qa_chain_self_answer, inputs=[
-                              msg, chatbot,  llm, embeddings, temperature, top_k, history_len],
-                              outputs=[msg, chatbot])
-        # 设置按钮的点击事件。当点击时，调用上面定义的 qa_chain_self_answer 函数，并传入用户的消息和聊天历史记录，然后更新文本框和聊天机器人组件。
-        db_wo_his_btn.click(model_center.qa_chain_self_answer, inputs=[
-                            msg, chatbot, llm, embeddings, temperature, top_k], outputs=[msg, chatbot])
-        # 设置按钮的点击事件。当点击时，调用上面定义的 respond 函数，并传入用户的消息和聊天历史记录，然后更新文本框和聊天机器人组件。
-        llm_btn.click(respond, inputs=[
-                      msg, chatbot, llm, history_len, temperature], outputs=[msg, chatbot], show_progress="minimal")
+        # 历史记录聊天按钮设置按钮的点击事件。当点击时，调用上面定义的 chat_qa_chain_self_answer 函数，并传入用户的消息和聊天历史记录，然后更新文本框和聊天机器人组件。
+        db_with_his_btn.click(model_center.chat_qa_chain_self_answer, inputs=[msg, chatbot,  llm, embeddings, temperature, top_k, history_len],outputs=[msg, chatbot])
+
+        # 无历史记录聊天按钮设置按钮的点击事件。当点击时，调用上面定义的 qa_chain_self_answer 函数，并传入用户的消息和聊天历史记录，然后更新文本框和聊天机器人组件。
+        db_wo_his_btn.click(model_center.qa_chain_self_answer, inputs=[msg, chatbot, llm, embeddings, temperature, top_k], outputs=[msg, chatbot])
+
+        # chatwith llm 按钮设置按钮的点击事件。当点击时，调用上面定义的 respond 函数，并传入用户的消息和聊天历史记录，然后更新文本框和聊天机器人组件。
+        llm_btn.click(respond, inputs=[msg, chatbot, llm, history_len, temperature], outputs=[msg, chatbot], show_progress="minimal")
 
         # 设置文本框的提交事件（即按下Enter键时）。功能与上面的 llm_btn 按钮点击事件相同。
-        msg.submit(respond, inputs=[
-                   msg, chatbot,  llm, history_len, temperature], outputs=[msg, chatbot], show_progress="hidden")
+        msg.submit(respond, inputs=[msg, chatbot,  llm, history_len, temperature], outputs=[msg, chatbot], show_progress="hidden")
+
         # 点击后清空后端存储的聊天记录
         clear.click(model_center.clear_history)
     gr.Markdown("""提醒：<br>
@@ -242,6 +237,8 @@ with block as demo:
     3. 使用中如果出现异常，将会在文本输入框进行展示，请不要惊慌。 <br>
     """)
 # threads to consume the request
+# 关闭所有正在运行的 Gradio 实例
+# 释放占用的网络端口和其他系统资源
 gr.close_all()
 # 启动新的 Gradio 应用，设置分享功能为 True，并使用环境变量 PORT1 指定服务器端口。
 # demo.launch(share=True, server_port=int(os.environ['PORT1']))

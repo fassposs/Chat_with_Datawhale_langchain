@@ -1,9 +1,21 @@
 import gradio as gr
-#输入文本处理程序
-def greet(name):
-    return "Helloqqq " + name + "!"
-#接口创建函数
-#fn设置处理函数，inputs设置输入接口组件，outputs设置输出接口组件
-#fn,inputs,outputs都是必填函数
-demo = gr.Interface(fn=greet, inputs="text", outputs="text")
+import random
+import time
+
+with gr.Blocks() as demo:
+    chatbot = gr.Chatbot()
+    msg = gr.Textbox()
+    clear = gr.Button("清除")
+
+    def respond(message, chat_history):
+        bot_message = random.choice(["你好吗？", "我爱你", "我很饿"])
+        chat_history.append({"role": "user", "content": message})
+        chat_history.append({"role": "assistant", "content": bot_message})
+        time.sleep(1)
+        return "", chat_history
+
+    msg.submit(respond, [msg, chatbot], [msg, chatbot])
+    clear.click(lambda: None, None, chatbot, queue=False)
+
+gr.close_all()
 demo.launch()
