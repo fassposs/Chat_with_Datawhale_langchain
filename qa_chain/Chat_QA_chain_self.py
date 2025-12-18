@@ -1,12 +1,6 @@
-# from langchain_core.prompts import PromptTemplate
-# from langchain_core import RetrievalQA
-# from langchain_chroma import Chroma
-# from langchain.chains import ConversationalRetrievalChain
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain_core.runnables import RunnablePassthrough, RunnableLambda
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.runnables import RunnableBranch,RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
-# from langchain_chroma import ConversationBufferMemory
-# from langchain.chat_models import ChatOpenAI
 import sys
 sys.path.append('/Users/lta/Desktop/llm-universe/project')
 from qa_chain.model_to_llm import model_to_llm
@@ -44,10 +38,56 @@ class Chat_QA_chain_self:
         self.Wenxin_secret_key = Wenxin_secret_key
         self.embedding = embedding
         self.embedding_key = embedding_key
-
-
         self.vectordb = get_vectordb(self.file_path, self.persist_path, self.embedding,self.embedding_key)
+        # 获取检索数据库
+        self.retriever = self.vectordb.as_retriever(search_type="similarity",search_kwargs={'k': top_k})  #默认similarity，k=4
+        # 获取一个大模型  
+        self.llm = model_to_llm(
+            self.model, 
+            temperature, 
+            self.appid, 
+            self.api_key, 
+            self.Spark_api_secret,
+            self.Wenxin_secret_key
+        )
+
+        condense_question_system_template = (
+            "请根据聊天记录总结用户最近的问题，"
+            "如果没有多余的聊天记录则返回用户的问题。"
+        )
+        condense_question_prompt = ChatPromptTemplate([
+                ("system", condense_question_system_template),
+                ("placeholder", "{chat_history}"),
+                ("human", "{question}"),
+            ])
+
+        retrieve_docs = RunnableBranch(
+            (lambda x: not x.get("chat_history", False), (lambda x: x["question"]) | self.retriever | self.format_docs),
+            condense_question_prompt | self.llm | StrOutputParser() | self.retriever | self.format_docs,
+        )
+
+        system_prompt = (
+            "你是一个问答任务的助手。 "
+            "请使用检索到的上下文片段回答这个问题。 "
+            "如果你不知道答案就说不知道。 "
+            "请使用简洁的话语回答用户。"
+            "\n\n"
+            "{context}"
+        )
+        qa_prompt = ChatPromptTemplate(
+            [
+                ("system", system_prompt),
+                ("placeholder", "{chat_history}"),
+                ("human", "{question}"),
+            ]
+        )
         
+        self.qa_chain = (
+            RunnablePassthrough().assign(context = retrieve_docs)
+            | qa_prompt
+            | self.llm
+            | StrOutputParser()
+        )
     
     def clear_history(self):
         "清空历史记录"
@@ -79,79 +119,18 @@ class Chat_QA_chain_self:
         if len(question) == 0:
             return "", self.chat_history
         
-        if len(question) == 0:
-            return ""
-        
         if temperature == None:
             temperature = self.temperature
 
-        # 获取一个大模型  
-        llm = model_to_llm(
-            self.model, 
-            temperature, 
-            self.appid, 
-            self.api_key, 
-            self.Spark_api_secret,
-            self.Wenxin_secret_key
-        )
-
-        #self.memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
-
-        # 获取检索数据库
-        retriever = self.vectordb.as_retriever(search_type="similarity",   
-                                        search_kwargs={'k': top_k})  #默认similarity，k=4
         # ===========================================
-        condense_question_system_template = (
-            "请根据聊天记录总结用户最近的问题，"
-            "如果没有多余的聊天记录则返回用户的问题。"
-        )
-        condense_question_prompt = ChatPromptTemplate([
-                ("system", condense_question_system_template),
-                ("placeholder", "{chat_history}"),
-                ("human", "{input}"),
-            ])
 
-        retrieve_docs = RunnableBranch(
-            (lambda x: not x.get("chat_history", False), (lambda x: x["input"]) | retriever, ),
-            condense_question_prompt | llm | StrOutputParser() | retriever,
-        )
+        result = self.qa_chain.invoke({"question": question,"chat_history": self.chat_history})       #result里有question、chat_history、answer
+        answer = re.sub(r"\\n", '<br/>', result)
+        # self.chat_history.append((question,answer)) #更新历史记录
 
-        system_prompt = (
-            "你是一个问答任务的助手。 "
-            "请使用检索到的上下文片段回答这个问题。 "
-            "如果你不知道答案就说不知道。 "
-            "请使用简洁的话语回答用户。"
-            "\n\n"
-            "{context}"
-        )
-        qa_prompt = ChatPromptTemplate.from_messages(
-            [
-                ("system", system_prompt),
-                ("placeholder", "{chat_history}"),
-                ("human", "{input}"),
-            ]
-        )
-        qa_chain = (
-            RunnablePassthrough().assign(context=combine_docs)
-            | qa_prompt
-            | llm
-            | StrOutputParser()
-        )
-
-        qa = RunnablePassthrough().assign(
-            context = retrieve_docs, 
-            ).assign(answer=qa_chain)
-        # ===========================================
-        # qa = ConversationalRetrievalChain.from_llm(
-        #     llm = llm,
-        #     retriever = retriever
-        # )
-        
-        #print(self.llm)
-        result = qa({"question": question,"chat_history": self.chat_history})       #result里有question、chat_history、answer
-        answer =  result['answer']
-        answer = re.sub(r"\\n", '<br/>', answer)
-        self.chat_history.append((question,answer)) #更新历史记录
+        # 将用户的消息和机器人的回复加入到聊天历史记录中。
+        self.chat_history.append({"role": "user","content":question})
+        self.chat_history.append({"role": "assistant","content":answer})
 
         return self.chat_history  #返回本次回答和更新后的历史记录
         

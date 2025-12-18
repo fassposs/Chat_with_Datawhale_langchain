@@ -80,9 +80,9 @@ def create_db(files=DEFAULT_DB_PATH, persist_directory=DEFAULT_PERSIST_PATH, emb
     persist_directory = './vector_db/chroma'
     # 加载数据库
     vectordb = Chroma.from_documents(
-    documents=split_docs,
-    embedding=embeddings,
-    persist_directory=persist_directory  # 允许我们将persist_directory目录保存到磁盘上
+        documents=split_docs,
+        embedding=embeddings,
+        persist_directory=persist_directory  # 允许我们将persist_directory目录保存到磁盘上
     ) 
 
     vectordb.persist()

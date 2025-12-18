@@ -174,8 +174,7 @@ with block as demo:
                 clear = gr.ClearButton(components=[chatbot], value="Clear console")
 
         with gr.Column(scale=1):
-            file = gr.File(label='请选择知识库目录', file_count='directory',
-                           file_types=['.txt', '.md', '.docx', '.pdf'])
+            file = gr.File(label='请选择知识库目录', file_count='directory',file_types=['.txt', '.md', '.docx', '.pdf'])
             with gr.Row():
                 init_db = gr.Button("知识库文件向量化")
             model_argument = gr.Accordion("参数配置", open=False)
@@ -214,8 +213,7 @@ with block as demo:
                                          value=INIT_EMBEDDING_MODEL)
 
         # 设置初始化向量数据库按钮的点击事件。当点击时，调用 create_db_info 函数，并传入用户的文件和希望使用的 Embedding 模型。
-        init_db.click(create_db_info,
-                      inputs=[file, embeddings], outputs=[msg])
+        init_db.click(create_db_info,inputs=[file, embeddings], outputs=[msg])
 
         # 历史记录聊天按钮设置按钮的点击事件。当点击时，调用上面定义的 chat_qa_chain_self_answer 函数，并传入用户的消息和聊天历史记录，然后更新文本框和聊天机器人组件。
         db_with_his_btn.click(model_center.chat_qa_chain_self_answer, inputs=[msg, chatbot,  llm, embeddings, temperature, top_k, history_len],outputs=[msg, chatbot])

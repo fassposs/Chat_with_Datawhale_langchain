@@ -2,8 +2,9 @@ import os
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
-from embedding.zhipuai_embedding import ZhipuAIEmbeddings
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
+# from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_community.embeddings import ZhipuAIEmbeddings
 from langchain_openai import OpenAIEmbeddings
 from llm.call_llm import parse_llm_api_key
 

@@ -32,8 +32,8 @@ def model_to_llm(model:str=None, temperature:float=0.0, appid:str=None, api_key:
         elif model in LLM_MODEL_DICT["zhipuai"]:
             if api_key == None:
                 api_key = parse_llm_api_key("zhipuai")
-            if base_url == None: base_url = os.environ.get("BASE_URL",None)
-            llm = ChatZhipuAI(model=model, zhipuai_api_key=api_key, temperature = temperature,zhipuai_api_base=base_url)
+            # if base_url == None: base_url = os.environ.get("BASE_URL",None)
+            llm = ChatZhipuAI(model=model, zhipuai_api_key=api_key, temperature = temperature)
         else:
             raise ValueError(f"model{model} not support!!!")
         return llm
